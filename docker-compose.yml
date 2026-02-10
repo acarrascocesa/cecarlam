@@ -1,0 +1,132 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database para CECARLAM
+  postgres:
+    image: postgres:16-alpine
+    container_name: cecarlam_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cecarlam_crm
+      POSTGRES_USER: cecarlam_user
+      POSTGRES_PASSWORD: cecarlam_secure_pass_2024
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - cecarlam_postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    networks:
+      - cecarlam_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cecarlam_user -d cecarlam_crm"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # CRM Backend (Node.js/Express) para CECARLAM
+  crm-backend:
+    build:
+      context: ./crm-backend
+      dockerfile: Dockerfile
+    container_name: cecarlam_crm_backend
+    restart: unless-stopped
+    env_file:
+      - ./crm-backend/.env
+    environment:
+      - NODE_ENV=production
+      - PORT=3011
+    ports:
+      - "3011:3011"
+    networks:
+      - cecarlam_network
+      - hsalud_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3011/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # CRM Frontend (React/Next.js) para CECARLAM
+  crm-frontend:
+    build:
+      context: ./crm
+      dockerfile: Dockerfile
+    container_name: cecarlam_crm_frontend
+    restart: unless-stopped
+    env_file:
+      - ./crm/.env
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=/api
+      - PORT=3010
+      - HOSTNAME=0.0.0.0
+    ports:
+      - "3010:3010"
+    networks:
+      - cecarlam_network
+      - hsalud_network
+    depends_on:
+      crm-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "next-server"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  cecarlam_postgres_data:
+    driver: local
+
+networks:
+  cecarlam_network:
+    driver: bridge
+  hsalud_network:
+    external: true
+    name: www_hsalud_network

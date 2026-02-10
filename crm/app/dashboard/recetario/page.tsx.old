@@ -1,0 +1,1068 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { LuisPrescription } from "@/components/dashboard/luis-prescription"
+import { LindaPrescription } from "@/components/dashboard/linda-prescription"
+import { useAppContext } from "@/context/app-context"
+import { useAuth } from "@/context/auth-context"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { AlertCircle, User, FileText, Save, Printer, Pill, Plus, Stethoscope, TestTube, Search, Check, ChevronsUpDown } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import Link from "next/link"
+import { getCurrentDateISO, cn } from "@/lib/utils"
+import { usePrescriptionPagination } from "@/hooks/usePrescriptionPagination"
+
+export default function RecetarioPage() {
+  const { currentUser, clinics, selectedClinicId, patients, prescriptions, medications, services, analytics, addPrescription } = useAppContext()
+  const { user } = useAuth()
+  const [selectedPatientId, setSelectedPatientId] = useState("")
+  const [prescriptionText, setPrescriptionText] = useState("")
+  const [showPrescriptionList, setShowPrescriptionList] = useState(false)
+  const [showMedicationSelector, setShowMedicationSelector] = useState(false)
+  const [showServiceSelector, setShowServiceSelector] = useState(false)
+  const [showAnalyticsSelector, setShowAnalyticsSelector] = useState(false)
+  const [showSignature, setShowSignature] = useState(false)
+  const [lindaSignatureType, setLindaSignatureType] = useState<'pediatra' | 'alergolo'>('pediatra')
+  const [medicationSearchTerm, setMedicationSearchTerm] = useState("")
+  const [analyticsSearchTerm, setAnalyticsSearchTerm] = useState("")
+  const [patientComboboxOpen, setPatientComboboxOpen] = useState(false)
+  const [patientSearchValue, setPatientSearchValue] = useState("")
+  
+  // Hook para paginación e impresión de recetas
+  const { printPrescriptionWithValidation } = usePrescriptionPagination()
+
+  // Función para obtener iniciales del nombre y apellido
+  const getInitials = (name: string) => {
+    const names = name.split(' ')
+    if (names.length >= 2) {
+      return `${names[0].charAt(0)}${names[names.length - 1].charAt(0)}`.toUpperCase()
+    }
+    return name.charAt(0).toUpperCase()
+  }
+
+  // Filtrar medicamentos según el término de búsqueda
+  const filteredMedications = medications.filter(medication =>
+    medication.name.toLowerCase().includes(medicationSearchTerm.toLowerCase()) ||
+    medication.genericName?.toLowerCase().includes(medicationSearchTerm.toLowerCase()) ||
+    medication.category?.toLowerCase().includes(medicationSearchTerm.toLowerCase()) ||
+    medication.dosage?.toLowerCase().includes(medicationSearchTerm.toLowerCase())
+  )
+
+  // Filtrar analíticas según el término de búsqueda
+  const filteredAnalytics = analytics.filter(analytic =>
+    analytic.name.toLowerCase().includes(analyticsSearchTerm.toLowerCase()) ||
+    analytic.genericName?.toLowerCase().includes(analyticsSearchTerm.toLowerCase()) ||
+    analytic.category?.toLowerCase().includes(analyticsSearchTerm.toLowerCase()) ||
+    analytic.description?.toLowerCase().includes(analyticsSearchTerm.toLowerCase())
+  )
+
+  // Filtrar pacientes para el combobox
+  const filteredPatients = patients.filter(patient => {
+    if (!patientSearchValue) return true;
+    const searchLower = patientSearchValue.toLowerCase();
+    return (
+      patient.name.toLowerCase().includes(searchLower) ||
+      (patient.email && patient.email.toLowerCase().includes(searchLower)) ||
+      (patient.phone && patient.phone.toLowerCase().includes(searchLower))
+    );
+  });
+
+  // Función para agregar medicamento al texto de la prescripción
+  const addMedicationToPrescription = (medication: any) => {
+    // Contar solo medicamentos y servicios existentes (líneas que empiecen con número)
+    const existingItems = prescriptionText.split('\n').filter(line => /^\d+\./.test(line.trim()));
+    const nextNumber = existingItems.length + 1;
+    
+    // Manejar campos undefined
+    const dosage = medication.dosage || "Dosis no especificada";
+    const frequency = medication.frequency || "Frecuencia no especificada";
+    const typicalDuration = medication.typicalDuration || "Duración no especificada";
+    const instructions = medication.instructions || "Sin instrucciones específicas";
+    
+    const medicationText = `${nextNumber}. ${medication.name} ${dosage} - ${frequency} - ${typicalDuration}\nInstrucciones: ${instructions}\n\n`
+    setPrescriptionText(prev => prev + medicationText)
+    setShowMedicationSelector(false)
+  }
+
+  // Función para agregar servicio al texto de la prescripción
+  const addServiceToPrescription = (service: any) => {
+    // Contar solo medicamentos y servicios existentes (líneas que empiecen con número)
+    const existingItems = prescriptionText.split('\n').filter(line => /^\d+\./.test(line.trim()));
+    const nextNumber = existingItems.length + 1;
+    
+    // Manejar campos undefined
+    const description = service.description || "Sin descripción";
+    const category = service.category || "Sin categoría";
+    const basePrice = service.basePrice || 0;
+    
+    const serviceText = `${nextNumber}. SERVICIO RECOMENDADO: ${service.name}\nDescripción: ${description}\nCategoría: ${category}\nPrecio estimado: RD$ ${basePrice.toLocaleString()}\n\n`
+    setPrescriptionText(prev => prev + serviceText)
+    setShowServiceSelector(false)
+  }
+
+  // Función para agregar analítica al texto de la prescripción
+  const addAnalyticToPrescription = (analytic: any) => {
+    // Contar solo medicamentos, servicios y analíticas existentes (líneas que empiecen con número)
+    const existingItems = prescriptionText.split('\n').filter(line => /^\d+\./.test(line.trim()));
+    const nextNumber = existingItems.length + 1;
+    
+    // Manejar campos undefined
+    const description = analytic.description || "Sin descripción";
+    const instructions = analytic.instructions || "Sin instrucciones";
+    const preparation = analytic.preparation || "Sin preparación específica";
+    const contraindications = analytic.contraindications || "Sin contraindicaciones";
+    
+    const analyticText = `${nextNumber}. ANÁLISIS SOLICITADO: ${analytic.name}\nDescripción: ${description}\nInstrucciones: ${instructions}\nPreparación: ${preparation}\nContraindicaciones: ${contraindications}\n\n`
+    setPrescriptionText(prev => prev + analyticText)
+    setShowAnalyticsSelector(false)
+  }
+
+  // Función para formatear automáticamente el texto de prescripción mientras se escribe
+  const handlePrescriptionTextChange = (value: string) => {
+    const lines = value.split('\n');
+    const currentLine = lines[lines.length - 1];
+    
+    // Auto-numeración instantánea cuando se escribe "-."
+    if (currentLine === '-.') {
+      // Contar medicamentos existentes
+      const existingItems = prescriptionText.split('\n').filter(line => /^\s*\d+\./.test(line));
+      const nextNumber = existingItems.length + 1;
+      
+      // Reemplazar "-." con el número automáticamente
+      const formattedLines = [...lines];
+      formattedLines[formattedLines.length - 1] = `${nextNumber}. `;
+      setPrescriptionText(formattedLines.join('\n'));
+      return;
+    }
+    
+    // Auto-numeración cuando empiezas una nueva línea con un medicamento
+    if (currentLine.length >= 5 && !currentLine.match(/^\s*\d+\./)) {
+      // Solo detectar medicamentos comunes para evitar auto-numerar texto normal
+      const medicineNames = /^(paracetamol|acetaminofen|ibuprofeno|aspirina|amoxicilina|omeprazol|loratadina|diclofenaco|metformina|losartan|enalapril|amlodipino|atorvastatina|simvastatina|levotiroxina|prednisona|dexametasona|furosemida|hidroclorotiazida|captopril|propranolol|metoprolol|carvedilol|digoxina|warfarina|clopidogrel|insulina|glibenclamida|metoclopramida|ranitidina|salbutamol|beclometasona|fluticasona|montelukast|cetirizina|difenhidramina|tramadol|ketorolaco|naproxeno|celecoxib|clonazepam|diazepam|alprazolam|fluoxetina|sertralina|escitalopram|amitriptilina|gabapentina|pregabalina)/i;
+      
+      if (medicineNames.test(currentLine.trim())) {
+        // Contar medicamentos existentes
+        const existingItems = prescriptionText.split('\n').filter(line => /^\s*\d+\./.test(line));
+        const nextNumber = existingItems.length + 1;
+        
+        // Auto-numerar
+        const formattedLines = [...lines];
+        formattedLines[formattedLines.length - 1] = `${nextNumber}. ${currentLine}`;
+        setPrescriptionText(formattedLines.join('\n'));
+        return;
+      }
+    }
+    
+    // Mantener el sistema anterior para casos que no detecte automáticamente
+    // Si el usuario presiona Enter dos veces seguidas, intentar formatear la línea anterior
+    const lastLine = lines[lines.length - 1];
+    const secondLastLine = lines[lines.length - 2];
+    const thirdLastLine = lines[lines.length - 3];
+    
+    // Detectar si acabamos de agregar una línea vacía después de texto
+    if (lines.length >= 2 && !lastLine.trim() && thirdLastLine && thirdLastLine.trim() && !secondLastLine.trim()) {
+      // Verificar si la línea de texto parece ser un medicamento/instrucción
+      const medicationKeywords = /\b(mg|ml|gr|g|tab|tableta|tabletas|capsula|capsulas|jarabe|suspension|gotas|inyeccion|ampolla|comprimido|comprimidos)\b/i;
+      const usageKeywords = /\b(cada|por|durante|tomar|usar|aplicar|via|oral|topico|horas|dias|semanas|meses|instrucciones|uso)\b/i;
+      const medicineNames = /\b(paracetamol|acetaminofen|ibuprofeno|aspirina|amoxicilina|omeprazol|loratadina|diclofenaco|metformina|losartan|enalapril|amlodipino|atorvastatina|simvastatina|levotiroxina|prednisona|dexametasona|furosemida|hidroclorotiazida|captopril|propranolol|metoprolol|carvedilol|digoxina|warfarina|clopidogrel|insulina|glibenclamida|metoclopramida|ranitidina|salbutamol|beclometasona|fluticasona|montelukast|cetirizina|difenhidramina|tramadol|ketorolaco|naproxeno|celecoxib|clonazepam|diazepam|alprazolam|fluoxetina|sertralina|escitalopram|amitriptilina|gabapentina|pregabalina)\b/i;
+      
+      const textToCheck = thirdLastLine.trim();
+      
+      // Verificar si la línea empieza con "-." y convertirlo a número
+      if (textToCheck.startsWith('-.')) {
+        // Contar medicamentos existentes para numeración automática
+        const existingItems = value.split('\n').filter(line => /^\s*\d+\./.test(line));
+        const nextNumber = existingItems.length + 1;
+        
+        // Reemplazar "-." con el número correspondiente
+        const formattedLines = [...lines];
+        const contentAfterDash = textToCheck.substring(2); // Remover los primeros dos caracteres "-."
+        formattedLines[formattedLines.length - 3] = `${nextNumber}.${contentAfterDash}`;
+        // Agregar una línea extra para espaciado entre medicamentos
+        formattedLines[formattedLines.length - 1] = '';
+        setPrescriptionText(formattedLines.join('\n'));
+        return;
+      }
+      
+      if (medicationKeywords.test(textToCheck) || usageKeywords.test(textToCheck) || medicineNames.test(textToCheck)) {
+        // Contar medicamentos existentes para numeración automática
+        const existingItems = value.split('\n').filter(line => /^\s*\d+\./.test(line));
+        const nextNumber = existingItems.length + 1;
+        
+        // Si la línea no empieza con número, agregarle numeración
+        if (!/^\s*\d+\./.test(textToCheck)) {
+          const formattedLines = [...lines];
+          formattedLines[formattedLines.length - 3] = `${nextNumber}. ${textToCheck}`;
+          // Agregar una línea extra para espaciado entre medicamentos
+          formattedLines[formattedLines.length - 1] = '';
+          setPrescriptionText(formattedLines.join('\n'));
+          return;
+        }
+      }
+    }
+    
+    setPrescriptionText(value);
+  }
+
+  // Obtener patientId de la URL si existe
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const patientIdFromUrl = urlParams.get('patientId')
+    if (patientIdFromUrl) {
+      setSelectedPatientId(patientIdFromUrl)
+    }
+  }, [])
+
+  const selectedClinic = clinics.find((c) => c.clinic_id === selectedClinicId)
+  const selectedPatient = patients.find((p) => p.id === selectedPatientId)
+
+  // Determinar qué recetario mostrar basado en el usuario actual Y la clínica seleccionada
+  const getClinicDoctorName = () => {
+    if (selectedClinic && selectedClinic.doctor_name) {
+      return selectedClinic.doctor_name
+    }
+    return currentUser?.name || ""
+  }
+
+  const clinicDoctorName = getClinicDoctorName()
+  const currentUserName = currentUser?.name || ""
+  
+  // Detectar Linda tanto por usuario actual como por clínica
+  const isLinda = clinicDoctorName.toLowerCase().includes("linda") || currentUserName.toLowerCase().includes("linda")
+  const isLuis = clinicDoctorName.toLowerCase().includes("luis") || currentUserName.toLowerCase().includes("luis")
+
+
+
+  // Determinar especialidad basada en el doctor
+  const getDoctorSpecialty = () => {
+    if (isLinda) return "Alergología"
+    if (isLuis) return "Cardiología"
+    return "Medicina General" // Por defecto
+  }
+
+  // Determinar nombre del doctor para mostrar
+  const getDoctorDisplayName = () => {
+    if (isLinda) return "Dra. Linda Flor Medina Lantigua"
+    if (isLuis) return "Dr. Luis Arturo Castillo Roa"
+    return clinicDoctorName || currentUser?.name || "Dr. Médico"
+  }
+
+  if (!currentUser || !selectedClinic) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Alert className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Información no disponible</AlertTitle>
+          <AlertDescription>
+            Por favor, asegúrese de haber iniciado sesión y seleccionado un centro médico para generar un recetario.
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
+  const handleSavePrescription = async () => {
+    if (!selectedPatient || !prescriptionText.trim()) return
+    
+    try {
+      // Para usuarios multiclínica, usar la clínica del paciente; para otros, usar la clínica seleccionada
+      const hasMultiClinicView = user?.multiClinicView && (user?.role === 'doctor' || user?.role === 'secretary')
+      const clinicIdToUse = hasMultiClinicView ? selectedPatient.clinicId : selectedClinicId
+      
+      if (!clinicIdToUse) {
+        alert("Error: No se pudo determinar la clínica para esta prescripción")
+        return
+      }
+      
+      const newPrescription = {
+        patient_id: selectedPatientId,
+        clinic_id: clinicIdToUse,
+        prescription_text: prescriptionText,
+        prescription_date: getCurrentDateISO() + 'T12:00:00.000Z', // Forzar mediodía UTC
+        notes: ""
+      }
+
+      await addPrescription(newPrescription)
+      setPrescriptionText("")
+      setSelectedPatientId("")
+      alert("Prescripción guardada exitosamente")
+      
+      // Navegación de retorno según parámetro
+      const urlParams = new URLSearchParams(window.location.search)
+      const returnTo = urlParams.get('returnTo')
+      if (returnTo === 'facturacion') {
+        const invoiceId = urlParams.get('invoiceId')
+        window.location.href = `/dashboard/facturacion/${invoiceId}`
+      } else if (returnTo === 'paciente') {
+        const patientId = urlParams.get('patientId')
+        window.location.href = `/dashboard/pacientes/${patientId}`
+      }
+    } catch (error) {
+      console.error('Error guardando prescripción:', error)
+      alert("Error al guardar la prescripción")
+    }
+  }
+
+
+
+  const handlePrintPrescription = () => {
+    if (!selectedPatient) return
+    
+    // Usar el sistema reutilizable para imprimir
+    printPrescriptionWithValidation({
+      content: prescriptionText || "",
+      patient: {
+        id: selectedPatient.id,
+        name: selectedPatient.name,
+        dateOfBirth: selectedPatient.dateOfBirth,
+        email: selectedPatient.email,
+        phone: selectedPatient.phone
+      },
+      doctor: {
+        id: currentUser.id,
+        name: getDoctorDisplayName(),
+        licenseNumber: currentUser.licenseNumber,
+        specialty: getDoctorSpecialty()
+      },
+      clinic: {
+        clinic_id: selectedClinic.clinic_id,
+        clinic_name: selectedClinic.clinic_name,
+        clinic_address: selectedClinic.clinic_address,
+        clinic_phone: selectedClinic.clinic_phone,
+        clinic_email: selectedClinic.clinic_email
+      },
+      isLinda,
+      showSignature,
+      signatureType: isLinda ? lindaSignatureType : undefined,
+      prescriptionDate: new Date()
+    })
+  }
+
+  return (
+    <div className="flex flex-col gap-3 sm:gap-4 max-w-9xl mx-auto w-full overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold">Recetario Médico</h1>
+        <div className="flex flex-wrap gap-2">
+          {selectedPatient && (
+            <>
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => setShowMedicationSelector(true)}>
+                <Pill className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Agregar Medicamento</span>
+                <span className="sm:hidden">Medicamento</span>
+              </Button>
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => setShowServiceSelector(true)}>
+                <Stethoscope className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Agregar Servicio</span>
+                <span className="sm:hidden">Servicio</span>
+              </Button>
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => setShowAnalyticsSelector(true)}>
+                <TestTube className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Agregar Analítica</span>
+                <span className="sm:hidden">Analítica</span>
+              </Button>
+              <Button asChild variant="outline" size="sm" className="text-xs sm:text-sm">
+                <Link href={`/dashboard/historia-clinica/nuevo?patientId=${selectedPatient.id}&returnTo=recetario&prescriptionText=${encodeURIComponent(prescriptionText)}`}>
+                  <FileText className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Crear Historia</span>
+                  <span className="sm:hidden">Historia</span>
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={handleSavePrescription}>
+                <Save className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                Guardar
+              </Button>
+            </>
+          )}
+          {!selectedPatient && (
+            <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => setShowPrescriptionList(true)}>
+              <FileText className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Ver Recetas</span>
+              <span className="sm:hidden">Recetas</span>
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Selector de Medicamentos */}
+      {showMedicationSelector && (
+        <Dialog 
+          open={showMedicationSelector} 
+          onOpenChange={(open) => {
+            setShowMedicationSelector(open)
+            if (!open) setMedicationSearchTerm("") // Limpiar búsqueda al cerrar
+          }}
+        >
+          <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-lg sm:text-xl">Seleccionar Medicamento</DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm">
+                Elige un medicamento de tu catálogo para agregarlo a la prescripción
+              </DialogDescription>
+            </DialogHeader>
+            
+            {/* Buscador estético */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Buscar medicamentos por nombre, genérico, categoría o dosis..."
+                value={medicationSearchTerm}
+                onChange={(e) => setMedicationSearchTerm(e.target.value)}
+                className="pl-10 border-slate-200 focus:border-blue-500 bg-white/50 backdrop-blur-sm"
+              />
+              {medicationSearchTerm && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-slate-100"
+                  onClick={() => setMedicationSearchTerm("")}
+                >
+                  ×
+                </Button>
+              )}
+            </div>
+
+            <div className="grid gap-4">
+              {medications.length === 0 ? (
+                <div className="text-center py-6 sm:py-8">
+                  <Pill className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
+                  <h3 className="text-base sm:text-lg font-medium mb-2">No hay medicamentos</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
+                    Primero debes agregar medicamentos a tu catálogo
+                  </p>
+                  <Button asChild size="sm" className="text-xs sm:text-sm">
+                    <Link href="/dashboard/medicamentos">
+                      Ir a Medicamentos
+                    </Link>
+                  </Button>
+                </div>
+              ) : filteredMedications.length === 0 ? (
+                <div className="text-center py-6 sm:py-8">
+                  <Search className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
+                  <h3 className="text-base sm:text-lg font-medium mb-2">No se encontraron medicamentos</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
+                    Intenta con otros términos de búsqueda
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs sm:text-sm"
+                    onClick={() => setMedicationSearchTerm("")}
+                  >
+                    Limpiar búsqueda
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {medicationSearchTerm && (
+                    <div className="text-xs sm:text-sm text-muted-foreground mb-2">
+                      Mostrando {filteredMedications.length} de {medications.length} medicamentos
+                    </div>
+                  )}
+                  {filteredMedications.map((medication) => (
+                    <Card key={medication.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                      <CardContent className="p-3 sm:p-4" onClick={() => addMedicationToPrescription(medication)}>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-2">
+                              <h3 className="font-semibold text-sm sm:text-lg">{medication.name}</h3>
+                              <Badge variant="outline" className="text-xs">
+                                {medication.genericName}
+                              </Badge>
+                              <Badge variant="secondary" className="text-xs">
+                                {medication.category}
+                              </Badge>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 text-xs sm:text-sm">
+                              <div>
+                                <span className="font-medium">Dosis:</span>
+                                <p className="text-muted-foreground">{medication.dosage}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium">Frecuencia:</span>
+                                <p className="text-muted-foreground">{medication.frequency}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium">Duración:</span>
+                                <p className="text-muted-foreground">{medication.typicalDuration}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium">Instrucciones:</span>
+                                <p className="text-muted-foreground line-clamp-2">{medication.instructions}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <Button variant="outline" size="sm" className="text-xs">
+                            <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Selector de Servicios */}
+      {showServiceSelector && (
+        <Dialog open={showServiceSelector} onOpenChange={setShowServiceSelector}>
+          <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-lg sm:text-xl">Seleccionar Servicio</DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm">
+                Recomienda un servicio de tu catálogo para agregarlo a la prescripción
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {services.length === 0 ? (
+                <div className="text-center py-6 sm:py-8">
+                  <Stethoscope className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
+                  <h3 className="text-base sm:text-lg font-medium mb-2">No hay servicios</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
+                    Primero debes agregar servicios a tu catálogo
+                  </p>
+                  <Button asChild size="sm" className="text-xs sm:text-sm">
+                    <Link href="/dashboard/servicios">
+                      Ir a Servicios
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                <Tabs defaultValue="all" className="space-y-4">
+                  <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1">
+                    <TabsTrigger value="all" className="text-xs sm:text-sm">Todos</TabsTrigger>
+                    <TabsTrigger value="Consulta" className="text-xs sm:text-sm">Consulta</TabsTrigger>
+                    <TabsTrigger value="Procedimiento" className="text-xs sm:text-sm">Procedimiento</TabsTrigger>
+                    <TabsTrigger value="Imagenología" className="text-xs sm:text-sm">Imagenología</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="all" className="space-y-4">
+                    {services.map((service) => (
+                      <Card key={service.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                        <CardContent className="p-3 sm:p-4" onClick={() => addServiceToPrescription(service)}>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-2">
+                                <h3 className="font-semibold text-sm sm:text-lg">{service.name}</h3>
+                                <Badge variant="outline" className="text-xs">
+                                  {service.category}
+                                </Badge>
+                                <Badge variant={service.insuranceType === "Seguro" ? "default" : "secondary"} className="text-xs">
+                                  {service.insuranceType}
+                                </Badge>
+                              </div>
+                              
+                              <p className="text-xs sm:text-sm text-muted-foreground mb-2">{service.description}</p>
+                              
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs sm:text-sm">
+                                <span className="font-medium">
+                                  Precio: RD$ {service.basePrice.toLocaleString()}
+                                </span>
+                                {service.insuranceCoveragePercentage > 0 && (
+                                  <span className="text-muted-foreground">
+                                    ({service.insuranceCoveragePercentage}% cubierto)
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <Button variant="outline" size="sm" className="text-xs">
+                              <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </TabsContent>
+                  
+                  {["Consulta", "Procedimiento", "Imagenología"].map((category) => (
+                    <TabsContent key={category} value={category} className="space-y-4">
+                      {services
+                        .filter((service) => service.category === category)
+                        .map((service) => (
+                          <Card key={service.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                            <CardContent className="p-3 sm:p-4" onClick={() => addServiceToPrescription(service)}>
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-2">
+                                    <h3 className="font-semibold text-sm sm:text-lg">{service.name}</h3>
+                                    <Badge variant={service.insuranceType === "Seguro" ? "default" : "secondary"} className="text-xs">
+                                      {service.insuranceType}
+                                    </Badge>
+                                  </div>
+                                  
+                                  <p className="text-xs sm:text-sm text-muted-foreground mb-2">{service.description}</p>
+                                  
+                                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs sm:text-sm">
+                                    <span className="font-medium">
+                                      Precio: RD$ {service.basePrice.toLocaleString()}
+                                    </span>
+                                    {service.insuranceCoveragePercentage > 0 && (
+                                      <span className="text-muted-foreground">
+                                        ({service.insuranceCoveragePercentage}% cubierto)
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <Button variant="outline" size="sm" className="text-xs">
+                                  <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Selector de Analíticas */}
+      {showAnalyticsSelector && (
+        <Dialog 
+          open={showAnalyticsSelector} 
+          onOpenChange={(open) => {
+            setShowAnalyticsSelector(open)
+            if (!open) setAnalyticsSearchTerm("") // Limpiar búsqueda al cerrar
+          }}
+        >
+          <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-lg sm:text-xl">Seleccionar Analítica</DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm">
+                Elige una analítica de tu catálogo para agregarla a la prescripción
+              </DialogDescription>
+            </DialogHeader>
+            
+            {/* Buscador estético */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Buscar analíticas por nombre, genérico, categoría o descripción..."
+                value={analyticsSearchTerm}
+                onChange={(e) => setAnalyticsSearchTerm(e.target.value)}
+                className="pl-10 border-slate-200 focus:border-blue-500 bg-white/50 backdrop-blur-sm"
+              />
+              {analyticsSearchTerm && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-slate-100"
+                  onClick={() => setAnalyticsSearchTerm("")}
+                >
+                  ×
+                </Button>
+              )}
+            </div>
+
+            <div className="grid gap-4">
+              {analytics.length === 0 ? (
+                <div className="text-center py-6 sm:py-8">
+                  <TestTube className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
+                  <h3 className="text-base sm:text-lg font-medium mb-2">No hay analíticas</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
+                    Primero debes agregar analíticas a tu catálogo
+                  </p>
+                  <Button asChild size="sm" className="text-xs sm:text-sm">
+                    <Link href="/dashboard/analiticas">
+                      Ir a Analíticas
+                    </Link>
+                  </Button>
+                </div>
+              ) : filteredAnalytics.length === 0 ? (
+                <div className="text-center py-6 sm:py-8">
+                  <Search className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
+                  <h3 className="text-base sm:text-lg font-medium mb-2">No se encontraron analíticas</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
+                    Intenta con otros términos de búsqueda
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs sm:text-sm"
+                    onClick={() => setAnalyticsSearchTerm("")}
+                  >
+                    Limpiar búsqueda
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {analyticsSearchTerm && (
+                    <div className="text-xs sm:text-sm text-muted-foreground mb-2">
+                      Mostrando {filteredAnalytics.length} de {analytics.length} analíticas
+                    </div>
+                  )}
+                  {filteredAnalytics.map((analytic) => (
+                    <Card key={analytic.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                      <CardContent className="p-3 sm:p-4" onClick={() => addAnalyticToPrescription(analytic)}>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-2">
+                              <h3 className="font-semibold text-sm sm:text-lg">{analytic.name}</h3>
+                              <Badge variant="outline" className="text-xs">
+                                {analytic.genericName}
+                              </Badge>
+                              <Badge variant="secondary" className="text-xs">
+                                {analytic.category}
+                              </Badge>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 text-xs sm:text-sm">
+                              <div>
+                                <span className="font-medium">Descripción:</span>
+                                <p className="text-muted-foreground line-clamp-2">{analytic.description}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium">Instrucciones:</span>
+                                <p className="text-muted-foreground line-clamp-2">{analytic.instructions}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium">Preparación:</span>
+                                <p className="text-muted-foreground line-clamp-2">{analytic.preparation}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium">Contraindicaciones:</span>
+                                <p className="text-muted-foreground line-clamp-2">{analytic.contraindications}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <Button variant="outline" size="sm" className="text-xs">
+                            <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {showPrescriptionList ? (
+        /* Lista de Recetas */
+        <div className="space-y-4 sm:space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => setShowPrescriptionList(false)}>
+              ← Volver
+            </Button>
+            <h2 className="text-lg sm:text-xl font-semibold">Recetas Generadas</h2>
+          </div>
+
+          {prescriptions.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-8">
+                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">No hay recetas generadas</h3>
+                <p className="text-muted-foreground mb-4">
+                  Aún no se han creado recetas para esta clínica.
+                </p>
+                <Button onClick={() => setShowPrescriptionList(false)}>
+                  Crear Primera Receta
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-3 sm:gap-4">
+              {prescriptions.map((prescription) => (
+                <Card key={prescription.id}>
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <Avatar className="h-8 w-8 sm:h-10 sm:w-10">
+                          <AvatarFallback className="text-xs sm:text-sm font-medium">
+                            {getInitials(prescription.patient_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h4 className="font-medium text-sm sm:text-base">{prescription.patient_name}</h4>
+                          <p className="text-xs sm:text-sm text-muted-foreground">
+                            {new Date(prescription.prescription_date).toLocaleDateString()} • {prescription.doctor_name}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={prescription.status === "Activa" ? "default" : "secondary"} className="text-xs">
+                          {prescription.status}
+                        </Badge>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="text-xs" 
+                          onClick={() => {
+                            // Determinar qué diseño usar basado en el doctor
+                            const isLinda = prescription.doctor_name?.toLowerCase().includes("linda")
+                            
+                            // Usar el sistema reutilizable para imprimir
+                            printPrescriptionWithValidation({
+                              content: prescription.prescription_text || "",
+                              patient: {
+                                id: prescription.patient_id || "unknown",
+                                name: prescription.patient_name || "Paciente",
+                                dateOfBirth: undefined, // No disponible en la lista
+                                email: undefined, // No disponible en la lista
+                                phone: undefined // No disponible en la lista
+                              },
+                              doctor: {
+                                id: prescription.doctor_id || "unknown",
+                                name: prescription.doctor_name || "Doctor",
+                                licenseNumber: prescription.doctor_license,
+                                specialty: isLinda ? "Alergología" : "Cardiología"
+                              },
+                              clinic: {
+                                clinic_id: prescription.clinic_id || "unknown",
+                                clinic_name: prescription.clinic_name || "Clínica",
+                                clinic_address: prescription.clinic_address || "Dirección de la clínica",
+                                clinic_phone: prescription.clinic_phone || "809-555-1234",
+                                clinic_email: prescription.clinic_email || "info@hsalud-pro.com"
+                              },
+                              isLinda,
+                              showSignature: !isLinda, // Para Luis siempre mostrar firma
+                              signatureType: isLinda ? 'pediatra' : undefined, // Default para Linda en lista
+                              prescriptionDate: prescription.prescription_date ? new Date(prescription.prescription_date) : undefined
+                            })
+                          }}
+                        >
+                          <Printer className="h-3 w-3 sm:h-4 sm:w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="mt-2 sm:mt-3 p-2 sm:p-3 bg-muted rounded-lg">
+                      <p className="text-xs sm:text-sm whitespace-pre-line line-clamp-3">
+                        {prescription.prescription_text}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : selectedPatientId && selectedPatient ? (
+        /* Receta Directa */
+        <div className="space-y-4 sm:space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => setSelectedPatientId("")}>
+              ← Cambiar Paciente
+            </Button>
+            <div className="flex gap-2">
+              <Button size="sm" className="text-xs sm:text-sm" onClick={handlePrintPrescription}>
+                <Printer className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                Imprimir
+              </Button>
+            </div>
+          </div>
+
+          {/* Receta */}
+          {isLinda ? (
+            <LindaPrescription 
+              patient={selectedPatient}
+              prescription={prescriptionText}
+              setPrescription={handlePrescriptionTextChange}
+              doctorName={getDoctorDisplayName()}
+              doctorSpecialty={getDoctorSpecialty()}
+              doctorLicense={currentUser.licenseNumber || "N/A"}
+              clinicAddress={selectedClinic.clinic_address}
+              clinicPhone={selectedClinic.clinic_phone}
+              clinicEmail={selectedClinic.clinic_email || ""}
+              clinicWebsite=""
+              doctorId={currentUser.id}
+              showSignature={showSignature}
+              setShowSignature={setShowSignature}
+              signatureType={lindaSignatureType}
+              setSignatureType={setLindaSignatureType}
+            />
+          ) : (
+            <LuisPrescription 
+              patient={selectedPatient}
+              prescription={prescriptionText}
+              setPrescription={handlePrescriptionTextChange}
+              doctorName={getDoctorDisplayName()}
+              doctorSpecialty={getDoctorSpecialty()}
+              doctorLicense={currentUser.licenseNumber || "N/A"}
+              clinicAddress={selectedClinic.clinic_address}
+              clinicPhone={selectedClinic.clinic_phone}
+              clinicEmail={selectedClinic.clinic_email || ""}
+              clinicWebsite=""
+              doctorId={currentUser.id}
+              showSignature={showSignature}
+              setShowSignature={setShowSignature}
+            />
+          )}
+        </div>
+      ) : (
+        /* Selección de Paciente */
+        <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
+          {/* Selección de Paciente */}
+          <Card>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <User className="h-4 w-4 sm:h-5 sm:w-5" />
+                Seleccionar Paciente
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
+                Elige el paciente para el cual generar la receta médica
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6">
+              <div>
+                <Popover open={patientComboboxOpen} onOpenChange={setPatientComboboxOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={patientComboboxOpen}
+                      className="w-full justify-between h-10 text-xs sm:text-sm"
+                    >
+                      {selectedPatientId ? (
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-5 w-5 sm:h-6 sm:w-6">
+                            <AvatarFallback className="text-xs font-medium">
+                              {getInitials(patients.find(p => p.id === selectedPatientId)?.name || '')}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-xs sm:text-sm">{patients.find(p => p.id === selectedPatientId)?.name}</span>
+                        </div>
+                      ) : (
+                        "Seleccionar paciente"
+                      )}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[300px] p-0" align="start">
+                    <div className="border-b px-3 py-2">
+                      <input
+                        type="text"
+                        placeholder="Buscar paciente..."
+                        className="w-full text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+                        value={patientSearchValue}
+                        onChange={(e) => setPatientSearchValue(e.target.value)}
+                      />
+                    </div>
+                    <div className="max-h-[200px] overflow-y-auto">
+                      {filteredPatients.length === 0 ? (
+                        <div className="p-4 text-center text-sm text-muted-foreground">
+                          {patientSearchValue ? "No se encontraron pacientes." : "No hay pacientes disponibles."}
+                        </div>
+                      ) : (
+                        filteredPatients.map((patient) => (
+                          <div
+                            key={patient.id}
+                            className="flex items-center gap-2 w-full p-2 hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors"
+                            onClick={() => {
+                              setSelectedPatientId(patient.id);
+                              setPatientComboboxOpen(false);
+                              setPatientSearchValue("");
+                            }}
+                          >
+                            <Avatar className="h-5 w-5 sm:h-6 sm:w-6">
+                              <AvatarFallback className="text-xs font-medium">
+                                {getInitials(patient.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col text-left flex-1">
+                              <span className="text-xs sm:text-sm font-medium">{patient.name}</span>
+                              {(patient.email || patient.phone) && (
+                                <span className="text-xs text-muted-foreground">
+                                  {patient.email || patient.phone}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Badge variant="outline" className="text-xs">
+                                {patient.insuranceProvider || "Sin seguro"}
+                              </Badge>
+                              <Check
+                                className={cn(
+                                  "h-4 w-4",
+                                  selectedPatientId === patient.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {selectedPatient && (
+                <div className="p-3 sm:p-4 border rounded-lg bg-muted/50">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                    <Avatar className="h-10 w-10 sm:h-12 sm:w-12">
+                      <AvatarFallback className="text-sm sm:text-lg font-medium">
+                        {getInitials(selectedPatient.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h4 className="font-medium text-sm sm:text-base">{selectedPatient.name}</h4>
+                      <p className="text-xs sm:text-sm text-muted-foreground">{selectedPatient.email}</p>
+                    </div>
+                  </div>
+                  <div className="grid gap-1 sm:gap-2 text-xs sm:text-sm">
+                    <div className="flex justify-between">
+                      <span>Teléfono:</span>
+                      <span>{selectedPatient.phone}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Seguro:</span>
+                      <Badge variant="outline" className="text-xs">{selectedPatient.insurance || "Sin seguro"}</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Estado:</span>
+                      <Badge variant={selectedPatient.status === "activo" ? "default" : "secondary"} className="text-xs">
+                        {selectedPatient.status || "activo"}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Información del Doctor */}
+          <Card>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
+                Información del Usuario
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6">
+              <div>
+                <Label className="text-xs sm:text-sm font-medium">Usuario</Label>
+                <p className="text-sm sm:text-lg font-semibold">{currentUser.name}</p>
+              </div>
+              <div>
+                <Label className="text-xs sm:text-sm font-medium">Licencia</Label>
+                <p className="text-xs sm:text-sm">{currentUser.licenseNumber || "N/A"}</p>
+              </div>
+              <div>
+                <Label className="text-xs sm:text-sm font-medium">Clínica</Label>
+                <p className="text-xs sm:text-sm font-medium">{selectedClinic.clinic_name}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">{selectedClinic.clinic_address}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">{selectedClinic.clinic_phone}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  )
+}

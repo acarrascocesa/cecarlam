@@ -1,0 +1,7 @@
+# Raíz del proyecto
+.env
+.env.local
+uploads/
+backups/
+*.log
+.DS_Store
