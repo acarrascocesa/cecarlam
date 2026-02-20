@@ -22,6 +22,7 @@ import { useAppContext } from "@/context/app-context"
 import { useAuth } from "@/context/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { getClinicDisplayName } from "@/lib/clinicDisplayNames"
+import { INSURANCE_PROVIDERS } from "@/lib/constants/insuranceProviders"
 
 export default function ReportesPage() {
   const { user } = useAuth()
@@ -387,26 +388,11 @@ export default function ReportesPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos los proveedores</SelectItem>
-                        <SelectItem value="SIN SEGURO">Sin seguro</SelectItem>
-                        <SelectItem value="SENASA_PENSIONADO">SENASA Pensionado</SelectItem>
-                        <SelectItem value="SENASA_CONTRIBUTIVO">SENASA Contributivo</SelectItem>
-                        <SelectItem value="MAPFRE">MAPFRE</SelectItem>
-                        <SelectItem value="HUMANO">ARS Humano</SelectItem>
-                        <SelectItem value="ARS_PRIMERA">ARS Primera</SelectItem>
-                        <SelectItem value="ARS_UNIVERSAL">ARS Universal</SelectItem>
-                        <SelectItem value="ARS_FUTURO">ARS Futuro</SelectItem>
-                        <SelectItem value="ARS_GMA">ARS GMA</SelectItem>
-                        <SelectItem value="ARS_MONUMENTAL">ARS Monumental</SelectItem>
-                        <SelectItem value="ARS_RENACER">ARS Renacer</SelectItem>
-                        <SelectItem value="ARS_BANCO_CENTRAL">ARS Banco Central</SelectItem>
-                        <SelectItem value="ARS_METASALUD">ARS Metasalud</SelectItem>
-                        <SelectItem value="ARS_SIGMA">ARS Sigma</SelectItem>
-                        <SelectItem value="APS">APS (Asmar Planes de Salud)</SelectItem>
-                        <SelectItem value="ARS_CMD">ARS CMD (Colegio Médico)</SelectItem>
-                        <SelectItem value="ARS_PLAN_SALUD_BC">ARS Plan Salud BC</SelectItem>
-                        <SelectItem value="ARS_RESERVAS">ARS Reservas</SelectItem>
-                        <SelectItem value="SEMMA">SEMMA</SelectItem>
-                        <SelectItem value="YUNEN">YUNEN</SelectItem>
+                        {INSURANCE_PROVIDERS.map((p) => (
+                          <SelectItem key={p.value} value={p.value}>
+                            {p.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

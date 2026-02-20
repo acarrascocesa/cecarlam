@@ -163,12 +163,12 @@ export default function NewAppointmentPage() {
     }
   }, [user?.email, selectedClinicId, selectedFormClinicId, hasMultiClinicView]);
 
-  // Cargar doctores cuando cambie la clínica
+  // Cargar doctores (rol doctor) cuando cambie la clínica
   useEffect(() => {
     const activeClinicId = hasMultiClinicView
       ? selectedFormClinicId
       : selectedClinicId;
-    if (activeClinicId && currentUser?.role === "secretary") {
+    if (activeClinicId && (currentUser?.role === "secretary" || currentUser?.role === "admin" || currentUser?.role === "doctor")) {
       loadAvailableDoctors(activeClinicId);
     }
   }, [
@@ -190,6 +190,9 @@ export default function NewAppointmentPage() {
       // Si solo hay un doctor, seleccionarlo automáticamente
       if (doctors.length === 1) {
         setSelectedDoctor(doctors[0].user_id);
+      } else if (currentUser?.role === "doctor" && doctors.some((d: any) => d.user_id === currentUser.id)) {
+        // Si el usuario es doctor, preseleccionarse
+        setSelectedDoctor(currentUser.id);
       }
     } catch (error) {
       setAvailableDoctors([]);
@@ -198,24 +201,21 @@ export default function NewAppointmentPage() {
 
   // Función para obtener el doctor correcto para la cita
   const getDoctorForAppointment = async () => {
+    // Si hay doctor seleccionado en el formulario, usarlo
+    if (selectedDoctor) {
+      return selectedDoctor;
+    }
+
     // Si el usuario es doctor, usar su ID
     if (currentUser?.role === "doctor") {
       return currentUser.id;
     }
 
-    // Si es secretaria, usar el doctor seleccionado
-    if (currentUser?.role === "secretary") {
-      if (selectedDoctor) {
-        return selectedDoctor;
-      }
-
-      // Fallback: usar el primer doctor disponible
-      if (availableDoctors.length > 0) {
-        return availableDoctors[0].user_id;
-      }
+    // Fallback: primer doctor disponible
+    if (availableDoctors.length > 0) {
+      return availableDoctors[0].user_id;
     }
 
-    // Fallback
     return currentUser?.id || "";
   };
 
@@ -466,8 +466,8 @@ export default function NewAppointmentPage() {
               </Popover>
             </div>
 
-            {/* Selector de doctor - mostrar para secretarias y admins */}
-            {(currentUser?.role === "secretary" || currentUser?.role === "admin") &&
+            {/* Selector de doctor - usuarios con rol doctor en la clínica */}
+            {(currentUser?.role === "secretary" || currentUser?.role === "admin" || currentUser?.role === "doctor") &&
               availableDoctors.length > 0 && (
                 <div className="space-y-2">
                   <Label htmlFor="doctor">Doctor</Label>

@@ -20,6 +20,9 @@ import { useAppContext } from "@/context/app-context"
 import { useAuth } from "@/context/auth-context"
 import * as XLSX from "xlsx"
 
+// Categorías de servicio (igual que en Catálogo de Servicios)
+const SERVICE_CATEGORIES = ["Consulta", "Procedimiento", "Laboratorio", "Imagenología", "Terapia", "Cortesía"]
+
 export default function InvoicesPage() {
   const { invoices } = useAppContext()
   const { user } = useAuth()
@@ -31,6 +34,7 @@ export default function InvoicesPage() {
   const [paymentMethodFilter, setPaymentMethodFilter] = useState("todos")
   const [statusFilter, setStatusFilter] = useState("todos")
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined)
+  const [serviceTypeFilter, setServiceTypeFilter] = useState("todos")
   const [filtersOpen, setFiltersOpen] = useState(false)
 
   // Función para obtener iniciales del nombre y apellido
@@ -48,6 +52,7 @@ export default function InvoicesPage() {
     setPaymentMethodFilter("todos")
     setStatusFilter("todos")
     setDateFilter(undefined)
+    setServiceTypeFilter("todos")
     setActiveTab("todos")
   }
 
@@ -60,6 +65,7 @@ export default function InvoicesPage() {
     paymentMethodFilter !== "todos",
     statusFilter !== "todos",
     dateFilter !== undefined,
+    serviceTypeFilter !== "todos",
     activeTab !== "todos"
   ].filter(Boolean).length
 
@@ -94,7 +100,12 @@ export default function InvoicesPage() {
     const matchesTab = activeTab === "todos" || 
       (invoice.status && invoice.status.toLowerCase() === activeTab.toLowerCase())
 
-    return matchesSearch && matchesPaymentMethod && matchesStatus && matchesTab
+    // Filtro por tipo de servicio: factura debe tener al menos un ítem con esa categoría
+    const items = invoice.items || []
+    const matchesServiceType = serviceTypeFilter === "todos" ||
+      items.some((item: any) => (item.category || item.service_category) === serviceTypeFilter)
+
+    return matchesSearch && matchesPaymentMethod && matchesStatus && matchesTab && matchesServiceType
   })
 
   // Función para exportar facturas a Excel (con servicios y totales)
@@ -410,6 +421,29 @@ export default function InvoicesPage() {
                             <span>Rechazada</span>
                           </div>
                         </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Filtro por Tipo de Servicio */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium">Tipo de servicio</Label>
+                    <Select value={serviceTypeFilter} onValueChange={setServiceTypeFilter}>
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">
+                          <div className="flex items-center gap-2">
+                            <Filter className="h-3 w-3" />
+                            <span>Todos los tipos</span>
+                          </div>
+                        </SelectItem>
+                        {SERVICE_CATEGORIES.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

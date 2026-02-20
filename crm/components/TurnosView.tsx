@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Clock, User, Phone, FileText } from "lucide-react"
+import { Clock, User, FileText, MoveToEnd } from "lucide-react"
 import { format, isToday } from "date-fns"
 import { es } from "date-fns/locale"
 import { useRouter } from "next/navigation"
@@ -127,10 +127,21 @@ export default function TurnosView({ date = new Date() }: TurnosViewProps) {
       await updateAppointment(appointmentId, {
         status: 'Completada'
       })
-      
-      console.log('Cita marcada como completada:', { appointmentId })
     } catch (error) {
       console.error('Error al marcar como completada:', error)
+    }
+  }
+
+  /** Pasar al final: actualiza arrival_timestamp a ahora para que quede último en la cola */
+  const handleMoveToEnd = async (appointmentId: string) => {
+    try {
+      const newArrivalTime = new Date().toISOString()
+      await updateAppointment(appointmentId, {
+        status: 'Confirmada',
+        arrivalTimestamp: newArrivalTime
+      })
+    } catch (error) {
+      console.error('Error al pasar al final:', error)
     }
   }
 
@@ -205,7 +216,7 @@ export default function TurnosView({ date = new Date() }: TurnosViewProps) {
             Pacientes en Espera
           </CardTitle>
           <CardDescription>
-            Ordenados por hora de llegada
+            Ordenados por hora de llegada. Si el paciente pierde su turno, use &quot;Pasar al final&quot;.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -223,8 +234,11 @@ export default function TurnosView({ date = new Date() }: TurnosViewProps) {
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-bold text-lg">
-                      {index + 1}
+                    <div className="flex flex-col items-center gap-0.5">
+                      <div className="w-10 h-10 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-bold text-lg">
+                        {index + 1}
+                      </div>
+                      <span className="text-xs font-medium text-muted-foreground">Turno #{index + 1}</span>
                     </div>
                     <Avatar className="h-10 w-10">
                       <AvatarFallback className="text-sm font-medium">
@@ -242,8 +256,17 @@ export default function TurnosView({ date = new Date() }: TurnosViewProps) {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="outline">{appointment.type}</Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleMoveToEnd(appointment.id)}
+                      title="El paciente pierde su lugar y pasa al final de la cola"
+                    >
+                      <MoveToEnd className="h-4 w-4 mr-1" />
+                      Pasar al final
+                    </Button>
                     <Button 
                       variant="default" 
                       size="sm"

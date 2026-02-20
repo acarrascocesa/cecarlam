@@ -161,24 +161,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     deletePrescription
   } = usePrescriptions(prescriptionsClinicId || undefined, undefined, prescriptionsDoctorId)
 
+  // Un solo centro CECARLAM: siempre usar la única clínica
   useEffect(() => {
-    if (authUser && clinics.length > 0 && !selectedClinicId) {
-      setSelectedClinicId(clinics[0].clinic_id)
+    if (authUser && clinics.length > 0) {
+      if (clinics.length === 1) {
+        setSelectedClinicId(clinics[0].clinic_id)
+      } else if (!selectedClinicId) {
+        setSelectedClinicId(clinics[0].clinic_id)
+      }
     }
   }, [authUser, clinics, selectedClinicId])
 
-  // Cargar desde localStorage al inicializar
+  // Cargar desde localStorage solo si hay varias clínicas
   useEffect(() => {
+    if (clinics.length <= 1) return
     const storedClinicId = localStorage.getItem("selectedClinicId")
     if (storedClinicId) {
       try {
         const parsedClinicId = JSON.parse(storedClinicId)
-        setSelectedClinicId(parsedClinicId)
-      } catch (error) {
+        const valid = clinics.some(c => c.clinic_id === parsedClinicId)
+        if (valid) setSelectedClinicId(parsedClinicId)
+      } catch {
         localStorage.removeItem("selectedClinicId")
       }
     }
-  }, [])
+  }, [clinics])
 
   // Limpiar estado cuando el usuario hace logout
   useEffect(() => {

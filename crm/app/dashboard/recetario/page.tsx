@@ -77,36 +77,34 @@ export default function RecetarioPage() {
     medications
   })
   
-  // Obtener nombre del doctor de la clínica
-  const clinicDoctorName = useMemo(() => {
-    if (selectedClinic?.doctor_name) {
-      return selectedClinic.doctor_name
+  // Usar el doctor logueado cuando es médico (no el dueño de la clínica)
+  const doctorNameForPrescription = useMemo(() => {
+    if (currentUser?.role === 'doctor' && currentUser?.name) {
+      return currentUser.name
     }
-    return currentUser?.name || ""
-  }, [selectedClinic, currentUser])
+    return selectedClinic?.doctor_name || currentUser?.name || ""
+  }, [currentUser, selectedClinic])
   
-  const currentUserName = currentUser?.name || ""
-  
-  // Determinar tipo de doctor usando utilidades
+  // Determinar tipo de doctor usando utilidades (por nombre del doctor logueado)
   const isLinda = useMemo(() => 
-    isDoctorType(clinicDoctorName, 'linda') || isDoctorType(currentUserName, 'linda'),
-    [clinicDoctorName, currentUserName]
+    isDoctorType(doctorNameForPrescription, 'linda'),
+    [doctorNameForPrescription]
   )
   
   const isLuis = useMemo(() => 
-    isDoctorType(clinicDoctorName, 'luis') || isDoctorType(currentUserName, 'luis'),
-    [clinicDoctorName, currentUserName]
+    isDoctorType(doctorNameForPrescription, 'luis'),
+    [doctorNameForPrescription]
   )
   
-  // Obtener información del doctor usando utilidades
+  // Obtener información del doctor (nombre y especialidad del doctor logueado)
   const doctorSpecialty = useMemo(() => 
-    getDoctorSpecialty(clinicDoctorName, currentUser?.specialty),
-    [clinicDoctorName, currentUser?.specialty]
+    getDoctorSpecialty(doctorNameForPrescription, currentUser?.specialty),
+    [doctorNameForPrescription, currentUser?.specialty]
   )
   
   const doctorDisplayName = useMemo(() => 
-    getDoctorDisplayName(clinicDoctorName, currentUser?.name),
-    [clinicDoctorName, currentUser?.name]
+    getDoctorDisplayName(doctorNameForPrescription, currentUser?.name),
+    [doctorNameForPrescription, currentUser?.name]
   )
   
   // Inicializar desde URL

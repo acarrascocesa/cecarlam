@@ -57,7 +57,7 @@ import { use } from "react"
 import { getCurrentDateISO } from "@/lib/utils"
 
 export default function InvoiceDetailsPage({ params }: { params: Promise<{ id: string }> }) {
-  const { invoices, updateInvoice, deleteInvoice } = useAppContext()
+  const { invoices, updateInvoice, deleteInvoice, services } = useAppContext()
   const { user } = useAuth()
   const canDeleteInvoice = user?.role !== "cajera"
   const router = useRouter()
@@ -149,6 +149,33 @@ export default function InvoiceDetailsPage({ params }: { params: Promise<{ id: s
       authorization_number: ""
     }
     setItems([...items, newItem])
+  }
+
+  const hasInsurance = (insuranceCovers || 0) > 0
+  const addItemFromCatalog = (serviceId: string) => {
+    const service = services.find((s: any) => s.id === serviceId)
+    if (!service) return
+    const basePrice = Number(service.basePrice) || 0
+    const pct = Number(service.insuranceCoveragePercentage) || 0
+    const insuranceCoversAmount = hasInsurance && pct > 0 ? (basePrice * pct / 100) : 0
+    const patientPaysAmount = hasInsurance && pct > 0 ? (basePrice * (100 - pct) / 100) : basePrice
+    const newItem = {
+      service_id: service.id,
+      description: service.name,
+      unit_price: basePrice,
+      amount: basePrice,
+      insurance_covers: insuranceCoversAmount,
+      patient_pays: patientPaysAmount,
+      authorization_number: ""
+    }
+    const newItems = [...items, newItem]
+    setItems(newItems)
+    const sumTotal = newItems.reduce((s, i) => s + (Number(i.unit_price ?? i.amount) || 0), 0)
+    const sumIns = newItems.reduce((s, i) => s + (Number(i.insurance_covers) || 0), 0)
+    const sumPat = newItems.reduce((s, i) => s + (Number(i.patient_pays) || 0), 0)
+    setTotalServices(sumTotal)
+    setInsuranceCovers(sumIns)
+    setPatientPays(sumPat)
   }
 
   useEffect(() => {
@@ -861,6 +888,24 @@ export default function InvoiceDetailsPage({ params }: { params: Promise<{ id: s
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  {services.length > 0 && (
+                    <div className="pb-4 border-b border-slate-200">
+                      <Label className="text-sm font-medium text-slate-700 mb-2 block">Agregar desde catálogo</Label>
+                      <div className="grid gap-2 max-h-48 overflow-y-auto sm:grid-cols-2">
+                        {services.map((service: any) => (
+                          <button
+                            key={service.id}
+                            type="button"
+                            onClick={() => addItemFromCatalog(service.id)}
+                            className="p-3 text-left border border-slate-200 rounded-lg hover:border-orange-300 hover:bg-orange-50 transition-colors"
+                          >
+                            <span className="font-medium text-slate-900 block truncate">{service.name}</span>
+                            <span className="text-sm text-slate-600">RD$ {Number(service.basePrice || 0).toLocaleString()}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {items.length > 0 ? (
                     items.map((item: any, index: number) => (
                       <div key={item.id || index} className="p-4 border border-slate-200 rounded-xl bg-slate-50/50 space-y-3">

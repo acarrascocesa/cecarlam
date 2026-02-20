@@ -22,6 +22,7 @@ const nextConfig = {
   // Deshabilitar Turbopack y usar webpack
   experimental: {
     turbo: false,
+    optimizePackageImports: ['lucide-react'],
   },
 };
 

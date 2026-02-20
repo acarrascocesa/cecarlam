@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,6 +16,7 @@ import { useAppContext } from "@/context/app-context"
 import { useAuth } from "@/context/auth-context"
 import { useRealClinics } from "@/hooks/useRealClinics"
 import { getClinicDisplayName } from "@/lib/clinicDisplayNames"
+import { INSURANCE_PROVIDERS } from "@/lib/constants/insuranceProviders"
 
 export default function NewPatientPage() {
   const router = useRouter()
@@ -26,6 +27,13 @@ export default function NewPatientPage() {
   
   // Check if user has multi-clinic view
   const hasMultiClinicView = user?.multiClinicView && (user?.role === 'doctor' || user?.role === 'secretary')
+
+  // Un solo centro CECARLAM: pre-seleccionar la única clínica
+  useEffect(() => {
+    if (clinics.length === 1) {
+      setSelectedFormClinicId(clinics[0].clinic_id)
+    }
+  }, [clinics])
 
   const [formData, setFormData] = useState({
     name: "",
@@ -257,26 +265,11 @@ export default function NewPatientPage() {
                       <SelectValue placeholder="Seleccionar proveedor de seguro (obligatorio)" />
                     </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="SIN SEGURO">Sin seguro</SelectItem>
-                    <SelectItem value="SENASA_PENSIONADO">SENASA Pensionado</SelectItem>
-                    <SelectItem value="SENASA_CONTRIBUTIVO">SENASA Contributivo</SelectItem>
-                    <SelectItem value="MAPFRE">MAPFRE</SelectItem>
-                    <SelectItem value="HUMANO">ARS Humano</SelectItem>
-                    <SelectItem value="ARS_PRIMERA">ARS Primera</SelectItem>
-                    <SelectItem value="ARS_UNIVERSAL">ARS Universal</SelectItem>
-                    <SelectItem value="ARS_FUTURO">ARS Futuro</SelectItem>
-                    <SelectItem value="ARS_GMA">ARS GMA</SelectItem>
-                    <SelectItem value="ARS_MONUMENTAL">ARS Monumental</SelectItem>
-                    <SelectItem value="ARS_RENACER">ARS Renacer</SelectItem>
-                    <SelectItem value="ARS_BANCO_CENTRAL">ARS Banco Central</SelectItem>
-                    <SelectItem value="ARS_METASALUD">ARS Metasalud</SelectItem>
-                    <SelectItem value="ARS_SIGMA">ARS Sigma</SelectItem>
-                    <SelectItem value="APS">APS (Asmar Planes de Salud)</SelectItem>
-                    <SelectItem value="ARS_CMD">ARS CMD (Colegio Médico)</SelectItem>
-                    <SelectItem value="ARS_PLAN_SALUD_BC">ARS Plan Salud BC</SelectItem>
-                    <SelectItem value="ARS_RESERVAS">ARS Reservas</SelectItem>
-                    <SelectItem value="SEMMA">SEMMA</SelectItem>
-                    <SelectItem value="YUNEN">YUNEN</SelectItem>
+                    {INSURANCE_PROVIDERS.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {errors.insurance && <p className="text-sm text-red-500">{errors.insurance}</p>}

@@ -1,5 +1,8 @@
 // lib/clinicDisplayNames.ts
 
+/** ID de la única clínica CECARLAM (centro único) */
+export const CECARLAM_CLINIC_ID = 'a0000001-0000-4000-8000-000000000001'
+
 export interface ClinicDisplayName {
   clinic_id: string
   display_name: string

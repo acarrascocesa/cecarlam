@@ -2,10 +2,7 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { AppointmentsOverview } from "@/components/dashboard/appointments-overview"
-import { RecentPatients } from "@/components/dashboard/recent-patients"
-import { RevenueByClinicChart } from "@/components/dashboard/revenue-by-clinic-chart"
-import { UpcomingAppointments } from "@/components/dashboard/upcoming-appointments"
+import dynamic from "next/dynamic"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
@@ -14,6 +11,12 @@ import { useAppContext } from "@/context/app-context"
 import { useAuth } from "@/context/auth-context"
 import { DollarSign, Users, Calendar, Activity, Stethoscope, CheckCircle, Filter, CreditCard, Banknote } from "lucide-react"
 import { useState } from "react"
+
+// Dynamic imports para componentes pesados
+const AppointmentsOverview = dynamic(() => import("@/components/dashboard/appointments-overview").then(mod => ({ default: mod.AppointmentsOverview })))
+const RecentPatients = dynamic(() => import("@/components/dashboard/recent-patients").then(mod => ({ default: mod.RecentPatients })))
+const RevenueByClinicChart = dynamic(() => import("@/components/dashboard/revenue-by-clinic-chart").then(mod => ({ default: mod.RevenueByClinicChart })))
+const UpcomingAppointments = dynamic(() => import("@/components/dashboard/upcoming-appointments").then(mod => ({ default: mod.UpcomingAppointments })))
 
 // Funciones de cálculo para datos reales
 const calculatePatientPaymentsByMethod = (invoices: any[], paymentMethodFilter?: string, dateFrom?: string, dateTo?: string) => {
