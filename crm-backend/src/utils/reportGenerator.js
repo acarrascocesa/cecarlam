@@ -4,6 +4,38 @@ const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
 
+// Código del prestador de servicio por proveedor de seguro (para reporte por seguros)
+const PROVIDER_CODES = {
+  'SENASA': '828033',
+  'SEMMA': '14903',
+  'APS': '70696',
+  'FUTURO': '15786',
+  'METASALUD': '12794',
+  'RESERVAS': '10008864',
+  'CMD': '90011255',
+  'MONUMENTAL': '10976',
+  'UASD': '6730',
+  'PRIMERA HUMANO': '19979',
+  'UNIVERSAL': '10950',
+  'ASEMAP': '9007',
+  'MAPFRE': '8277625'
+};
+
+function getProviderCodesText(insuranceBillingRows) {
+  if (!insuranceBillingRows || insuranceBillingRows.length === 0) return '';
+  const providerKey = 'Proveedor de Seguro';
+  const seen = new Set();
+  const codes = [];
+  for (const row of insuranceBillingRows) {
+    const name = (row[providerKey] || '').toString().trim();
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    const code = PROVIDER_CODES[name] || PROVIDER_CODES[name.toUpperCase()];
+    if (code) codes.push(code);
+  }
+  return codes.join('; ') || '';
+}
+
 class ReportGenerator {
   constructor() {
     this.uploadsDir = path.join(__dirname, '../../uploads');
@@ -534,11 +566,11 @@ class ReportGenerator {
   // Métodos para reporte de facturación por seguros
   addInsuranceBillingContent(doc, data) {
     doc.fontSize(14).text('Reporte de Facturación por Seguros', { underline: true }).moveDown();
-    
-    // Campos manuales
+    const providerCodesText = getProviderCodesText(data.insuranceBilling);
+    // Campos manuales (código del prestador se rellena según proveedores en el reporte)
     doc.fontSize(12)
        .text('Número comprobante fiscal: ____________________')
-       .text('Código del prestador de servicio: ____________________')
+       .text(`Código del prestador de servicio: ${providerCodesText || '____________________'}`)
        .moveDown();
     
     // Resumen
@@ -579,10 +611,10 @@ class ReportGenerator {
     worksheet.getRow(1).getCell(1).font = { size: 16, bold: true };
     worksheet.addRow([]);
     
-    // Campos manuales para que el doctor complete
+    const providerCodesText = getProviderCodesText(data.insuranceBilling);
     worksheet.addRow(['Número comprobante fiscal:', '____________________']);
     worksheet.getRow(3).getCell(1).font = { bold: true };
-    worksheet.addRow(['Código del prestador de servicio:', '____________________']);
+    worksheet.addRow(['Código del prestador de servicio:', providerCodesText || '____________________']);
     worksheet.getRow(4).getCell(1).font = { bold: true };
     worksheet.addRow([]);
     
@@ -658,9 +690,10 @@ class ReportGenerator {
   }
 
   generateInsuranceBillingCSV(data) {
+    const providerCodesText = getProviderCodesText(data.insuranceBilling);
     let csv = 'Reporte de Facturación por Seguros\n\n';
     csv += 'Número comprobante fiscal:,____________________\n';
-    csv += 'Código del prestador de servicio:,____________________\n\n';
+    csv += `Código del prestador de servicio:,${providerCodesText || '____________________'}\n\n`;
     csv += 'Resumen\n';
     csv += 'Total Servicios,Valor Total,Proveedores,Proveedor Principal\n';
     csv += `${data.summary.totalServices},${data.summary.totalValue},${data.summary.providersCount},${data.summary.topProvider || 'N/A'}\n\n`;
